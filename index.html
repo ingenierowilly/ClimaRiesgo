@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Alerta Térmica</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#12161f;
+    --card:#1c2230;
+    --card-border:#2a3242;
+    --text:#eef2f7;
+    --muted:#8b93a7;
+    --r-low:#4ade80;
+    --r-mod:#fbbf24;
+    --r-high:#fb923c;
+    --r-vhigh:#ef4444;
+    --r-extreme:#b91c1c;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans', system-ui, sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .app{ width:100%; max-width:480px; min-height:100vh; position:relative; }
+  .screen-view{
+    display:none;
+    padding:20px 20px 100px;
+    flex-direction:column;
+    gap:16px;
+    min-height:100vh;
+  }
+  .screen-view.active{ display:flex; }
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding-top:8px;
+  }
+  header h1{ font-size:15px; font-weight:600; letter-spacing:0.02em; }
+  .back-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding-top:8px;
+  }
+  .back-btn{
+    width:32px; height:32px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    font-size:16px;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .back-row h1{ font-size:16px; font-weight:600; }
+
+  .status-pill{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    background:var(--card);
+    border:1px solid var(--card-border);
+    padding:4px 10px;
+    border-radius:20px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .dot{ width:6px; height:6px; border-radius:50%; background:var(--r-low); }
+  .dot.offline{ background:var(--muted); }
+
+  .gauge-card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:20px;
+    padding:28px 20px 20px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+  }
+  .gauge-wrap{ position:relative; width:240px; height:140px; }
+  svg{ display:block; }
+  .gauge-center{
+    position:absolute; top:58%; left:50%;
+    transform:translate(-50%,-50%);
+    text-align:center;
+  }
+  .gauge-value{ font-family:'IBM Plex Mono', monospace; font-size:40px; font-weight:700; line-height:1; }
+  .gauge-unit{ font-family:'IBM Plex Mono', monospace; font-size:13px; color:var(--muted); margin-top:2px; }
+  .risk-pill{
+    margin-top:12px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px; font-weight:600; letter-spacing:0.03em;
+    padding:6px 16px; border-radius:20px; text-transform:uppercase;
+  }
+  .risk-desc{ margin-top:10px; font-size:13px; color:var(--muted); text-align:center; line-height:1.5; max-width:320px; }
+
+  .meta-row{ display:flex; gap:12px; }
+  .meta-card{ flex:1; background:var(--card); border:1px solid var(--card-border); border-radius:14px; padding:14px; }
+  .meta-label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+  .meta-value{ font-family:'IBM Plex Mono', monospace; font-size:18px; font-weight:600; margin-top:4px; }
+
+  .actions{ display:flex; flex-direction:column; gap:10px; margin-top:4px; }
+  .btn{
+    background:var(--card); border:1px solid var(--card-border); color:var(--text);
+    font-family:'IBM Plex Sans', sans-serif; font-size:14px; font-weight:500;
+    padding:14px 16px; border-radius:12px;
+    display:flex; justify-content:space-between; align-items:center; cursor:pointer;
+  }
+  .btn:active{ background:#242c3d; }
+  .btn .arrow{ color:var(--muted); }
+  .btn.primary{ background:var(--text); color:var(--bg); border:none; justify-content:center; font-weight:600; }
+  .btn.danger{ color:#ef4444; border-color:rgba(239,68,68,0.3); }
+
+  .footnote{ font-size:11px; color:var(--muted); text-align:center; line-height:1.5; margin-top:8px; }
+
+  /* Protocolo screen */
+  .protocol-banner{
+    border-radius:16px;
+    padding:16px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+  }
+  .protocol-section{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:16px;
+    padding:16px;
+  }
+  .protocol-section h3{
+    font-size:14px;
+    margin-bottom:8px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .protocol-section p, .protocol-section li{
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.6;
+  }
+  .protocol-section ul{ padding-left:18px; margin-top:4px; }
+  .symptom-box{
+    background:rgba(239,68,68,0.1);
+    border:1px solid rgba(239,68,68,0.25);
+    border-radius:14px;
+    padding:14px;
+  }
+  .symptom-box h3{ color:#ef4444; font-size:13px; margin-bottom:6px; }
+  .symptom-box p{ color:#fca5a5; font-size:13px; line-height:1.6; }
+
+  /* Refugios screen */
+  .shelter-card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    padding:14px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .shelter-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .shelter-name{ font-size:14px; font-weight:600; }
+  .shelter-type{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    color:var(--muted);
+    text-transform:uppercase;
+    background:rgba(255,255,255,0.05);
+    padding:2px 8px;
+    border-radius:10px;
+    white-space:nowrap;
+  }
+  .shelter-addr{ font-size:12px; color:var(--muted); }
+  .shelter-row{ display:flex; gap:8px; margin-top:4px; }
+  .shelter-row .btn{ flex:1; padding:10px 12px; font-size:13px; }
+  .empty-state{
+    background:var(--card);
+    border:1px dashed var(--card-border);
+    border-radius:16px;
+    padding:24px 16px;
+    text-align:center;
+  }
+  .empty-state p{ font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:14px; }
+
+  .form-field{ display:flex; flex-direction:column; gap:6px; }
+  .form-field label{ font-size:12px; color:var(--muted); }
+  .form-field input, .form-field select{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    color:var(--text);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:14px;
+    padding:12px 14px;
+    border-radius:12px;
+    outline:none;
+  }
+  .form-field input:focus, .form-field select:focus{ border-color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- PANTALLA 1: HOME / MEDIDOR -->
+  <div class="screen-view active" id="view-home">
+    <header>
+      <h1>Alerta Térmica</h1>
+      <div class="status-pill">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Actualizando…</span>
+      </div>
+    </header>
+
+    <div class="gauge-card">
+      <div class="gauge-wrap">
+        <svg viewBox="0 0 240 140" width="240" height="140">
+          <path d="M 20 120 A 100 100 0 0 1 220 120" fill="none" stroke="#2a3242" stroke-width="14" stroke-linecap="round"/>
+          <path id="gaugeArc" d="M 20 120 A 100 100 0 0 1 220 120" fill="none" stroke="#4ade80" stroke-width="14" stroke-linecap="round"
+                stroke-dasharray="314" stroke-dashoffset="314"/>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-value" id="wbValue">--</div>
+          <div class="gauge-unit">°C bulbo húmedo</div>
+        </div>
+      </div>
+      <div class="risk-pill" id="riskPill" style="background:rgba(74,222,128,0.15); color:#4ade80;">Calculando</div>
+      <div class="risk-desc" id="riskDesc">Obteniendo datos meteorológicos de tu ubicación.</div>
+    </div>
+
+    <div class="meta-row">
+      <div class="meta-card">
+        <div class="meta-label">Temp. aire</div>
+        <div class="meta-value" id="airTemp">-- °C</div>
+      </div>
+      <div class="meta-card">
+        <div class="meta-label">Humedad</div>
+        <div class="meta-value" id="humidity">-- %</div>
+      </div>
+    </div>
+
+    <div class="meta-row">
+      <div class="meta-card">
+        <div class="meta-label">Ubicación</div>
+        <div class="meta-value" id="locationName" style="font-size:14px;">--</div>
+      </div>
+      <div class="meta-card">
+        <div class="meta-label">Actualizado</div>
+        <div class="meta-value" id="lastUpdate" style="font-size:14px;">--</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <div class="btn primary" id="refreshBtn">Actualizar ahora</div>
+      <div class="btn" id="protocolBtn">
+        <span>Ver protocolo de actuación</span>
+        <span class="arrow">→</span>
+      </div>
+      <div class="btn" id="shelterBtn">
+        <span>Refugios cercanos</span>
+        <span class="arrow">→</span>
+      </div>
+    </div>
+
+    <div class="footnote">
+      Cálculo de bulbo húmedo (aprox. Stull) a partir de temperatura y humedad relativa. Umbrales orientativos, no sustituyen indicaciones médicas ni de protección civil.
+    </div>
+  </div>
+
+  <!-- PANTALLA 2: PROTOCOLO -->
+  <div class="screen-view" id="view-protocol">
+    <div class="back-row">
+      <div class="back-btn" data-back="view-home">←</div>
+      <h1>Protocolo de actuación</h1>
+    </div>
+
+    <div class="protocol-banner" id="protocolBanner" style="background:rgba(74,222,128,0.15); color:#4ade80;">
+      Nivel actual: RIESGO BAJO
+    </div>
+
+    <div class="symptom-box">
+      <h3>⚠ Señales de golpe de calor — emergencia</h3>
+      <p>Temperatura corporal muy alta, piel caliente y seca (o sudoración excesiva), confusión, pulso rápido, pérdida de conciencia. Si ves esto: llama a emergencias de inmediato, mueve a la persona a la sombra, moja su piel y ropa con agua fresca, y no le den líquidos si está inconsciente.</p>
+    </div>
+
+    <div class="protocol-section" id="protocolContent">
+      <!-- contenido dinámico según nivel de riesgo -->
+    </div>
+
+    <div class="protocol-section">
+      <h3>🧓 Personas vulnerables</h3>
+      <ul>
+        <li>Adultos mayores, bebés y niños pequeños</li>
+        <li>Personas con enfermedades crónicas (cardíacas, respiratorias, renales)</li>
+        <li>Personas que trabajan o hacen ejercicio al aire libre</li>
+        <li>Personas sin acceso a aire acondicionado o ventilación</li>
+      </ul>
+    </div>
+
+    <div class="protocol-section">
+      <h3>💧 Hidratación y hogar</h3>
+      <ul>
+        <li>Agua con frecuencia, evita alcohol y exceso de cafeína</li>
+        <li>Cierra persianas y cortinas durante el día para bloquear el sol directo</li>
+        <li>Ventila el hogar temprano en la mañana o de noche, cuando baja la temperatura</li>
+        <li>Ropa ligera, clara y holgada</li>
+      </ul>
+    </div>
+
+    <div class="footnote">
+      Guía orientativa de carácter general. Ante síntomas graves, contacta siempre a los servicios de emergencia de tu país.
+    </div>
+  </div>
+
+  <!-- PANTALLA 3: REFUGIOS -->
+  <div class="screen-view" id="view-shelters">
+    <div class="back-row">
+      <div class="back-btn" data-back="view-home">←</div>
+      <h1>Refugios cercanos</h1>
+    </div>
+
+    <div id="shelterEmptyState" class="empty-state" style="display:none;">
+      <p>Todavía no tienes refugios guardados. Agrega lugares con aire acondicionado accesibles al público cerca de ti: bibliotecas, centros comerciales, iglesias, centros de salud.</p>
+      <div class="btn primary" id="emptyAddBtn">Agregar mi primer refugio</div>
+    </div>
+
+    <div id="shelterList" style="display:flex; flex-direction:column; gap:10px;"></div>
+
+    <div class="btn" id="addShelterBtn">
+      <span>+ Agregar refugio</span>
+    </div>
+
+    <div class="footnote">
+      Esta lista la construyes tú. No existe un registro público unificado de refugios climáticos en tiempo real, así que la app depende de los lugares que agregues o compartas con tu comunidad.
+    </div>
+  </div>
+
+  <!-- PANTALLA 4: FORMULARIO AGREGAR REFUGIO -->
+  <div class="screen-view" id="view-add-shelter">
+    <div class="back-row">
+      <div class="back-btn" data-back="view-shelters">←</div>
+      <h1>Agregar refugio</h1>
+    </div>
+
+    <div class="form-field">
+      <label>Nombre del lugar</label>
+      <input type="text" id="shelterNameInput" placeholder="Ej. Biblioteca Pública El Tunal">
+    </div>
+
+    <div class="form-field">
+      <label>Tipo de lugar</label>
+      <select id="shelterTypeInput">
+        <option value="Biblioteca">Biblioteca</option>
+        <option value="Centro comercial">Centro comercial</option>
+        <option value="Centro de salud">Centro de salud</option>
+        <option value="Templo / iglesia">Templo / iglesia</option>
+        <option value="Espacio público">Espacio público</option>
+        <option value="Otro">Otro</option>
+      </select>
+    </div>
+
+    <div class="form-field">
+      <label>Dirección</label>
+      <input type="text" id="shelterAddrInput" placeholder="Dirección o punto de referencia">
+    </div>
+
+    <div class="actions">
+      <div class="btn primary" id="saveShelterBtn">Guardar refugio</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const STORAGE_KEY = 'alerta_termica_cache_v1';
+  const SHELTERS_KEY = 'alerta_termica_shelters_v1';
+  const GAUGE_CIRCUMFERENCE = 314;
+  const GAUGE_MIN = 10;
+  const GAUGE_MAX = 35;
+
+  let currentRisk = null; // se actualiza cada lectura, lo usa la pantalla de protocolo
+
+  // ---------- NAVEGACIÓN ----------
+  function showScreen(id) {
+    document.querySelectorAll('.screen-view').forEach(v => v.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id === 'view-protocol') renderProtocol();
+    if (id === 'view-shelters') renderShelters();
+  }
+  document.querySelectorAll('[data-back]').forEach(btn => {
+    btn.addEventListener('click', () => showScreen(btn.dataset.back));
+  });
+
+  // ---------- CÁLCULO DE BULBO HÚMEDO Y RIESGO ----------
+  function calcWetBulb(T, RH) {
+    return T * Math.atan(0.151977 * Math.sqrt(RH + 8.313659))
+      + Math.atan(T + RH)
+      - Math.atan(RH - 1.676331)
+      + 0.00391838 * Math.pow(RH, 1.5) * Math.atan(0.023101 * RH)
+      - 4.686035;
+  }
+
+  function getRiskLevel(wb) {
+    if (wb < 21) return { level: 'bajo', color: '#4ade80', bg: 'rgba(74,222,128,0.15)',
+      desc: 'Condiciones normales. Mantén hidratación habitual.' };
+    if (wb < 24) return { level: 'moderado', color: '#fbbf24', bg: 'rgba(251,191,36,0.15)',
+      desc: 'Precaución para personas mayores, niños y quienes trabajan al aire libre. Hidrátate con frecuencia.' };
+    if (wb < 27) return { level: 'alto', color: '#fb923c', bg: 'rgba(251,146,60,0.15)',
+      desc: 'Riesgo elevado. Evita esfuerzo físico entre 12:00 y 17:00. Revisa a personas vulnerables.' };
+    if (wb < 30) return { level: 'muy alto', color: '#ef4444', bg: 'rgba(239,68,68,0.15)',
+      desc: 'Peligro real de golpe de calor. Permanece en interiores frescos. Contacta a personas mayores.' };
+    return { level: 'extremo', color: '#b91c1c', bg: 'rgba(185,28,28,0.18)',
+      desc: 'Emergencia sanitaria. Busca refugio con aire acondicionado de inmediato. Evita salir.' };
+  }
+
+  function updateGauge(wb) {
+    const clamped = Math.max(GAUGE_MIN, Math.min(GAUGE_MAX, wb));
+    const pct = (clamped - GAUGE_MIN) / (GAUGE_MAX - GAUGE_MIN);
+    const offset = GAUGE_CIRCUMFERENCE - (pct * GAUGE_CIRCUMFERENCE);
+    document.getElementById('gaugeArc').style.strokeDashoffset = offset;
+  }
+
+  function renderReading(data, isOffline) {
+    const { airTemp, humidity, wetBulb, location, timestamp } = data;
+    const risk = getRiskLevel(wetBulb);
+    currentRisk = risk;
+
+    document.getElementById('wbValue').textContent = wetBulb.toFixed(1);
+    document.getElementById('airTemp').textContent = airTemp.toFixed(1) + ' °C';
+    document.getElementById('humidity').textContent = Math.round(humidity) + ' %';
+    document.getElementById('locationName').textContent = location;
+    document.getElementById('lastUpdate').textContent = new Date(timestamp).toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'});
+
+    const pill = document.getElementById('riskPill');
+    pill.textContent = 'Riesgo ' + risk.level;
+    pill.style.background = risk.bg;
+    pill.style.color = risk.color;
+    document.getElementById('riskDesc').textContent = risk.desc;
+    document.getElementById('gaugeArc').style.stroke = risk.color;
+
+    updateGauge(wetBulb);
+
+    const dot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    if (isOffline) {
+      dot.classList.add('offline');
+      statusText.textContent = 'Sin conexión · datos guardados';
+    } else {
+      dot.classList.remove('offline');
+      statusText.textContent = 'En vivo';
+    }
+  }
+
+  function saveCache(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+  }
+  function loadCache() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
+  }
+
+  // ---------- GEOCODING CON RESPALDO REAL (no solo texto genérico) ----------
+  async function reverseGeocodeName(lat, lon) {
+    // Intento 1: Open-Meteo geocoding
+    try {
+      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&language=es`);
+      const json = await res.json();
+      if (json.results && json.results.length) {
+        const r = json.results[0];
+        return r.name + (r.admin1 ? ', ' + r.admin1 : '');
+      }
+    } catch(e) {}
+
+    // Intento 2 (respaldo real): BigDataCloud, servicio gratuito sin API key
+    try {
+      const res2 = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=es`);
+      const json2 = await res2.json();
+      const city = json2.city || json2.locality;
+      const region = json2.principalSubdivision;
+      if (city) return city + (region ? ', ' + region : '');
+      if (region) return region;
+    } catch(e) {}
+
+    // Último respaldo: coordenadas redondeadas (nunca texto genérico sin información real)
+    return `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
+  }
+
+  async function fetchWeather(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('weather fetch failed');
+    const json = await res.json();
+    const airTemp = json.current.temperature_2m;
+    const humidity = json.current.relative_humidity_2m;
+    const wetBulb = calcWetBulb(airTemp, humidity);
+    const location = await reverseGeocodeName(lat, lon);
+    return { airTemp, humidity, wetBulb, location, timestamp: Date.now(), lat, lon };
+  }
+
+  function getPosition() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) { reject(new Error('no geolocation')); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        err => reject(err),
+        { timeout: 8000 }
+      );
+    });
+  }
+
+  async function refresh() {
+    document.getElementById('statusText').textContent = 'Actualizando…';
+    try {
+      let coords;
+      const cached = loadCache();
+      try {
+        coords = await getPosition();
+      } catch(e) {
+        coords = cached ? { lat: cached.lat, lon: cached.lon } : { lat: 40.4168, lon: -3.7038 };
+      }
+      const data = await fetchWeather(coords.lat, coords.lon);
+      saveCache(data);
+      renderReading(data, false);
+    } catch(e) {
+      const cached = loadCache();
+      if (cached) {
+        renderReading(cached, true);
+      } else {
+        document.getElementById('statusText').textContent = 'Sin datos disponibles';
+        document.getElementById('riskDesc').textContent = 'No hay conexión ni datos guardados previamente. Conéctate a internet una vez para cargar tu primera lectura.';
+      }
+    }
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', refresh);
+  document.getElementById('protocolBtn').addEventListener('click', () => showScreen('view-protocol'));
+  document.getElementById('shelterBtn').addEventListener('click', () => showScreen('view-shelters'));
+
+  // ---------- PANTALLA PROTOCOLO ----------
+  function renderProtocol() {
+    const risk = currentRisk || getRiskLevel(20);
+    const banner = document.getElementById('protocolBanner');
+    banner.textContent = 'Nivel actual: RIESGO ' + risk.level.toUpperCase();
+    banner.style.background = risk.bg;
+    banner.style.color = risk.color;
+
+    const content = document.getElementById('protocolContent');
+    const actionsByLevel = {
+      'bajo': ['Mantén hidratación habitual durante el día.', 'No se requieren medidas adicionales.'],
+      'moderado': ['Aumenta la ingesta de agua, incluso sin sed.', 'Evita ejercicio intenso al mediodía.', 'Revisa cómo están las personas mayores de tu entorno.'],
+      'alto': ['Evita esfuerzo físico entre 12:00 y 17:00.', 'Permanece en espacios frescos o con sombra.', 'Llama o visita a personas vulnerables cercanas.', 'Ten a la mano el mapa de refugios de esta app.'],
+      'muy alto': ['Suspende actividades al aire libre.', 'Busca aire acondicionado o ventilación cruzada.', 'Vigila signos de agotamiento por calor en niños y mayores.', 'Ten lista la lista de refugios cercanos.'],
+      'extremo': ['No salgas salvo estricta necesidad.', 'Dirígete a un refugio con aire acondicionado ya.', 'Contacta a servicios de emergencia ante cualquier síntoma.', 'Revisa activamente a personas que viven solas.']
+    };
+    const actions = actionsByLevel[risk.level] || actionsByLevel['bajo'];
+    content.innerHTML = '<h3>✅ Qué hacer ahora</h3><ul>' + actions.map(a => '<li>' + a + '</li>').join('') + '</ul>';
+  }
+
+  // ---------- PANTALLA REFUGIOS ----------
+  function loadShelters() {
+    try {
+      const raw = localStorage.getItem(SHELTERS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch(e) { return []; }
+  }
+  function saveShelters(list) {
+    try { localStorage.setItem(SHELTERS_KEY, JSON.stringify(list)); } catch(e) {}
+  }
+
+  function renderShelters() {
+    const shelters = loadShelters();
+    const listEl = document.getElementById('shelterList');
+    const emptyEl = document.getElementById('shelterEmptyState');
+
+    if (!shelters.length) {
+      emptyEl.style.display = 'block';
+      listEl.innerHTML = '';
+      return;
+    }
+    emptyEl.style.display = 'none';
+
+    listEl.innerHTML = shelters.map((s, i) => `
+      <div class="shelter-card">
+        <div class="shelter-top">
+          <div class="shelter-name">${s.name}</div>
+          <div class="shelter-type">${s.type}</div>
+        </div>
+        <div class="shelter-addr">${s.address || 'Sin dirección registrada'}</div>
+        <div class="shelter-row">
+          <div class="btn" onclick="openInMaps('${encodeURIComponent(s.address || s.name)}')">Cómo llegar</div>
+          <div class="btn danger" onclick="deleteShelter(${i})">Eliminar</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function openInMaps(query) {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+  }
+
+  function deleteShelter(index) {
+    const shelters = loadShelters();
+    shelters.splice(index, 1);
+    saveShelters(shelters);
+    renderShelters();
+  }
+
+  document.getElementById('addShelterBtn').addEventListener('click', () => showScreen('view-add-shelter'));
+  document.getElementById('emptyAddBtn').addEventListener('click', () => showScreen('view-add-shelter'));
+
+  document.getElementById('saveShelterBtn').addEventListener('click', () => {
+    const name = document.getElementById('shelterNameInput').value.trim();
+    const type = document.getElementById('shelterTypeInput').value;
+    const address = document.getElementById('shelterAddrInput').value.trim();
+    if (!name) { alert('Ingresa al menos el nombre del lugar.'); return; }
+    const shelters = loadShelters();
+    shelters.push({ name, type, address });
+    saveShelters(shelters);
+    document.getElementById('shelterNameInput').value = '';
+    document.getElementById('shelterAddrInput').value = '';
+    showScreen('view-shelters');
+  });
+
+  // ---------- INICIO ----------
+  const cachedInit = loadCache();
+  if (cachedInit) {
+    renderReading(cachedInit, true);
+  }
+  refresh();
+</script>
+
+</body>
+</html>
